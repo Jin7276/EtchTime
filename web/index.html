@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF">
+<title>刻时</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-screen="todos">
+<div class="app">
+
+  <main class="screens">
+
+    <!-- ===================== 代办 ===================== -->
+    <section class="screen" data-screen="todos">
+      <div class="page">
+        <header class="page-head">
+          <div>
+            <h1>代办</h1>
+            <p class="sub">点卡片看详情 · 长按拖动排序</p>
+          </div>
+          <div class="head-actions">
+            <button class="tool theme-btn" id="themeBtn2" aria-label="切换日间 / 夜间">
+              <svg class="ic-moon" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 14.6A8.2 8.2 0 1 1 9.4 3.8a6.6 6.6 0 0 0 10.8 10.8z"/></svg>
+              <svg class="ic-sun" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.7 5.7l1.6 1.6M16.7 16.7l1.6 1.6M18.3 5.7l-1.6 1.6M7.3 16.7l-1.6 1.6"/></svg>
+            </button>
+            <button class="btn-primary" id="addBtn">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13"/></svg>
+              新建代办
+            </button>
+          </div>
+        </header>
+
+        <ul class="todo-grid" id="todoList"></ul>
+      </div>
+    </section>
+
+    <!-- ===================== 数据 ===================== -->
+    <section class="screen" data-screen="data">
+      <div class="page">
+        <header class="page-head">
+          <div>
+            <h1>数据</h1>
+          </div>
+        </header>
+
+        <div class="data-grid">
+          <div class="panel chart-panel">
+            <div class="chart-head">
+              <div class="day-nav">
+                <button class="nav-day" id="dayPrev" aria-label="前一天">‹</button>
+                <span class="day-label" id="dayLabel">今天</span>
+                <button class="nav-day" id="dayNext" aria-label="后一天">›</button>
+              </div>
+              <div class="segmented" data-seg="range">
+                <button class="on">今日</button><button>本周</button><button>本月</button><button>自定义</button>
+              </div>
+            </div>
+
+            <div class="chart-stats" id="statsRow">
+              <div class="cs"><b id="stCount">0</b><span>专注次数</span></div>
+              <div class="cs"><b id="stTotal">—</b><span>专注时长</span></div>
+              <div class="cs"><b id="stAvg">—</b><span>日均时长</span></div>
+              <button class="pal-btn" id="palBtn" aria-label="扇形图配色">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="9.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="8.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="16" cy="13.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10.4" cy="15" r="1.1" fill="currentColor" stroke="none"/></svg>
+              </button>
+              <button class="eye-btn" id="eyeBtn" aria-label="显示或隐藏统计">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3.1"/></svg>
+              </button>
+            </div>
+
+            <div class="chart-body">
+              <div class="pie-wrap" id="pie"></div>
+              <div class="total">总计时长<b id="totalNum">0 分钟</b></div>
+            </div>
+          </div>
+
+          <div class="mid-col">
+            <div class="panel legend-panel">
+              <div class="panel-title">代办占比</div>
+              <div class="legend-scroll"><ul class="legend" id="legend"></ul></div>
+            </div>
+
+            <div class="panel today-panel" id="todayPanel">
+              <div class="panel-title">今日时间段</div>
+              <div class="tl-scroll"><ol class="tl" id="timeline"></ol></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== 日历 ===================== -->
+    <section class="screen" data-screen="calendar">
+      <div class="page">
+        <header class="page-head">
+          <div>
+            <h1>日历</h1>
+          </div>
+        </header>
+
+        <div class="cal-layout">
+          <div class="panel cal-panel">
+            <div class="cal-head">
+              <button class="chev chev-prev" aria-label="上个月">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6 9 12l5.5 6"/></svg>
+              </button>
+              <span class="cal-title">2026 年 11 月</span>
+              <button class="chev chev-next" aria-label="下个月">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 6 15 12l-5.5 6"/></svg>
+              </button>
+            </div>
+
+            <div class="cal-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+            <div class="cal-grid" id="calGrid"></div>
+          </div>
+
+          <div class="mid-col">
+            <div class="panel legend-panel">
+              <div class="panel-title" id="dayTitle">今天</div>
+              <div class="legend-scroll"><ul class="legend" id="dayLegend"></ul></div>
+            </div>
+            <div class="panel today-panel">
+              <div class="panel-title">时间段</div>
+              <div class="tl-scroll"><ol class="tl" id="dayTimeline"></ol></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== 我的 ===================== -->
+    <section class="screen" data-screen="me">
+      <div class="page me-page">
+        <header class="page-head"><div><h1>我的</h1></div></header>
+
+        <div class="profile">
+          <div class="avatar">时</div>
+          <div>
+            <div class="p-name">刻时</div>
+            <div class="p-sub">已专注 0 小时 · 0 次计时</div>
+          </div>
+        </div>
+
+        <div class="group">
+          <button class="row" id="exportBtn"><span>导出备份</span><em>JSON 文件</em><i class="chev-r"></i></button>
+          <button class="row" id="importBtn"><span>导入备份</span><em>换设备用</em><i class="chev-r"></i></button>
+        </div>
+
+        <div class="group">
+          <button class="row danger" id="clearBtn"><span>清空所有数据</span><i class="chev-r"></i></button>
+        </div>
+
+        <p class="foot-note">数据仅保存在本机，换设备请先导出备份</p>
+      </div>
+    </section>
+
+    <!-- ===================== 代办历史 ===================== -->
+    <section class="screen" data-screen="detail">
+      <div class="page hist-page">
+        <header class="sub-head">
+          <button class="icon-btn" id="backToData" aria-label="返回">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg>
+          </button>
+          <div class="sh-txt">
+            <h1 id="detailName">代办</h1>
+            <p class="sub" id="detailSub"></p>
+          </div>
+        </header>
+
+        <div class="hist-cal" id="histCal">
+          <div class="hist-cal-head">
+            <span class="cal-title" id="histTitle">2026 年 11 月</span>
+            <span class="hist-hint">上下滑动切换月份</span>
+          </div>
+          <div class="cal-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+          <div class="cal-grid hist-grid" id="histGrid"></div>
+        </div>
+
+        <div id="records"></div>
+      </div>
+    </section>
+
+    <!-- ===================== 计时 ===================== -->
+    <section class="screen screen-timer" data-screen="timer">
+      <div class="timer-top">
+        <span class="tt-todo" id="ttTodo">代办</span>
+      </div>
+
+      <div class="timer-corner">
+        <button class="tool" id="keepBtn" aria-label="保持屏幕常亮">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="13" rx="2.5"/><path d="M8.5 20.5h7"/><circle cx="12" cy="11" r="2.6"/></svg>
+        </button>
+        <button class="tool" id="bgClear" aria-label="移除背景图" hidden>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+
+        <button class="tool" id="bgBtn" aria-label="更换背景图">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3.2" y="5.2" width="17.6" height="13.6" rx="3"/>
+            <circle cx="8.6" cy="10.2" r="1.5"/>
+            <path d="M4 16.6l4.6-4.2a1.6 1.6 0 0 1 2.1 0l2.6 2.3 1.9-1.6a1.6 1.6 0 0 1 2.1 0l2.7 2.4"/>
+          </svg>
+        </button>
+
+        <button class="tool" id="themeBtn" aria-label="切换日间 / 夜间">
+          <svg class="ic-moon" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 14.6A8.2 8.2 0 1 1 9.4 3.8a6.6 6.6 0 0 0 10.8 10.8z"/></svg>
+          <svg class="ic-sun" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.7 5.7l1.6 1.6M16.7 16.7l1.6 1.6M18.3 5.7l-1.6 1.6M7.3 16.7l-1.6 1.6"/></svg>
+        </button>
+      </div>
+
+      <div class="timer-main">
+        <div class="clock" id="clock">00:00:00</div>
+
+        <div class="timer-actions">
+          <button class="tool" id="pauseBtn" aria-label="暂停">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="7" y="5.5" width="3.4" height="13" rx="1.2"/><rect x="13.6" y="5.5" width="3.4" height="13" rx="1.2"/></svg>
+          </button>
+          <button class="tool end" id="endBtn" aria-label="结束">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.4"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="laps" id="lapPanel" hidden>
+        <div class="laps-head">记次</div>
+        <div class="lap-scroll"><div id="lapList"></div></div>
+        <div class="live">
+          <span class="lb">距离上次记次</span>
+          <span class="lv" id="lapLive">00:00</span>
+        </div>
+      </div>
+
+      <button class="lapbtn" id="lapBtn" aria-label="记次">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 5h11l-2 3.5 2 3.5H5"/></svg>
+        记次
+      </button>
+
+      <input type="file" id="bgInput" accept="image/*" hidden>
+
+      <div class="overlay" id="pauseOverlay">
+        <div class="modal">
+          <div class="m-label">已暂停</div>
+          <div class="m-time" id="pauseTime">00:00</div>
+          <div class="m-hint">暂停期间不计入计时</div>
+          <button class="m-btn" id="resumeBtn">结束暂停</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <input type="file" id="importInput" accept="application/json,.json" hidden>
+
+  <div class="tabbar">
+    <div class="dock">
+      <button class="tab on" data-go="todos">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6.8h16M4 12h16M4 17.2h10.5"/></svg>
+        <span>代办</span>
+      </button>
+      <button class="tab" data-go="data">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5.5 19.5V11M12 19.5v-15M18.5 19.5v-6"/></svg>
+        <span>数据</span>
+      </button>
+      <button class="tab" data-go="calendar">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/></svg>
+        <span>日历</span>
+      </button>
+      <button class="tab" data-go="me">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="8.4" r="3.7"/><path d="M4.9 19.6c1.1-3.5 3.8-5 7.1-5s6 1.5 7.1 5"/></svg>
+        <span>我的</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 代办卡片弹窗 -->
+  <div class="sheet" id="actions">
+    <div class="todo-sheet">
+      <div class="ts-name" id="menuName">代办</div>
+      <div class="ts-row">
+        <button class="ts-btn" id="actRename">重命名</button>
+        <button class="ts-btn" id="actEdit">编辑</button>
+      </div>
+      <button class="ts-link" id="actHistory">
+        <span>查看历史记录</span>
+        <i class="chev-r"></i>
+      </button>
+      <div class="ts-foot">
+        <span>累计 <b id="menuCount">0</b> 次</span>
+        <span>累计 <b id="menuTotal">0m</b></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 单条记录 -->
+  <div class="sheet" id="recSheet">
+    <div class="todo-sheet">
+      <div class="ts-name" id="recTitle">记录</div>
+      <div class="rec-line" id="recSub"></div>
+      <div class="ts-row">
+        <button class="ts-btn" id="recEdit">修改时间</button>
+        <button class="ts-btn danger" id="recDelete">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 选日期 -->
+  <div class="sheet" id="dayPicker">
+    <div class="day-box">
+      <div class="cal-head">
+        <button class="chev" id="pkPrev">‹</button>
+        <span class="cal-title" id="pkTitle">2026 年 11 月</span>
+        <button class="chev" id="pkNext">›</button>
+      </div>
+      <div class="cal-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+      <div class="cal-grid pk-grid" id="pkGrid"></div>
+    </div>
+  </div>
+
+  <!-- 扇形图配色 -->
+  <div class="sheet" id="palSheet">
+    <div class="pal-box">
+      <div class="pal-title">扇形图配色</div>
+      <div class="pal-row" id="palRow"></div>
+    </div>
+  </div>
+
+  <!-- 自定义时间段 -->
+  <div class="sheet" id="rangeSheet">
+    <div class="dialog">
+      <h3>自定义时间段</h3>
+      <div class="range-row">
+        <input type="date" id="rgFrom" class="dlg-input">
+        <span class="range-sep">至</span>
+        <input type="date" id="rgTo" class="dlg-input">
+      </div>
+      <p class="dlg-msg" id="rgMsg"></p>
+      <div class="dlg-actions">
+        <button class="dlg-btn" id="rgAll">全部时间</button>
+        <button class="dlg-btn primary" id="rgOk">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 通用弹窗 -->
+  <div class="sheet" id="dialog">
+    <div class="dialog">
+      <h3 id="dlgTitle">标题</h3>
+      <input id="dlgInput" class="dlg-input" maxlength="20" placeholder="代办名称">
+      <div class="wheel-wrap" id="dlgTimeRow" hidden>
+        <div class="wheel" id="wSh"></div><span class="wcolon">:</span>
+        <div class="wheel" id="wSm"></div>
+        <span class="wsep">至</span>
+        <div class="wheel" id="wEh"></div><span class="wcolon">:</span>
+        <div class="wheel" id="wEm"></div>
+      </div>
+      <div class="dur-row" id="durRow" hidden>
+        <button class="dur-btn" id="durMinus">−</button>
+        <span class="dur-val" id="durVal">0 分</span>
+        <button class="dur-btn" id="durPlus">+</button>
+      </div>
+      <p id="dlgMsg" class="dlg-msg"></p>
+      <button class="dlg-danger" id="dlgDanger" hidden>删除这个代办</button>
+      <div class="dlg-actions">
+        <button class="dlg-btn" id="dlgCancel">取消</button>
+        <button class="dlg-btn primary" id="dlgOk">确定</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>

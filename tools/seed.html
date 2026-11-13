@@ -1,0 +1,44 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>seed</title></head>
+<body><pre id="o">seeding...</pre>
+<script>
+const now = Date.now(), D = 86400000;
+const todos = [
+  { id: 'a1', name: '行测套卷',     createdAt: now - 30 * D },
+  { id: 'a2', name: '申论套卷复盘', createdAt: now - 30 * D },
+  { id: 'a3', name: '政治理论背诵', createdAt: now - 20 * D },
+  { id: 'a4', name: '英语阅读',     createdAt: now - 12 * D },
+  { id: 'a5', name: '资料分析',     createdAt: now - 8 * D },
+  { id: 'a6', name: '错题整理',     createdAt: now - 5 * D },
+];
+let seed = 11;
+const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+const sessions = [];
+for (let d = 0; d < 18; d++) {
+  const base = new Date(now - d * D);
+  base.setHours(7, 0, 0, 0);
+  const n = 1 + Math.floor(rnd() * 3);
+  for (let i = 0; i < n; i++) {
+    const t = todos[Math.floor(rnd() * todos.length)];
+    const start = base.getTime() + (i * 3 + Math.floor(rnd() * 3)) * 3600000;
+    const dur = Math.round((20 + rnd() * 70) * 60000);
+    if (start + dur > now - 60000) continue;
+    const pauses = rnd() > 0.75 ? [[start + dur * 0.4, start + dur * 0.4 + 150000]] : [];
+    sessions.push({ id: 's' + d + '_' + i, todoId: t.id, start, end: start + dur, pauses });
+  }
+}
+localStorage.setItem('timelog.db.v1', JSON.stringify({ todos, sessions }));
+const q = new URLSearchParams(location.search);
+if (q.has('cur')) {
+  localStorage.setItem('timelog.current.v1', JSON.stringify({
+    todoId: 'a1',
+    start: now - 15 * 60000,
+    pauses: [[now - 9 * 60000, now - 8.5 * 60000]],
+    pausedAt: q.has('pause') ? now - 42000 : null,
+  }));
+} else {
+  localStorage.removeItem('timelog.current.v1');
+}
+document.getElementById('o').textContent = 'seeded ' + sessions.length + ' sessions / ' + todos.length + ' todos';
+</script>
+</body></html>

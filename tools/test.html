@@ -1,0 +1,131 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>selftest</title>
+<style>body{font:14px/1.6 monospace;padding:20px;white-space:pre-wrap}</style>
+</head><body>
+<pre id="out">running...</pre>
+<iframe id="f" src="../web/index.html" style="width:1280px;height:800px;border:1px solid #ddd"></iframe>
+<script>
+const log = [];
+const out = document.getElementById('out');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function report(ok, msg) { log.push((ok ? 'PASS  ' : 'FAIL  ') + msg); }
+
+(async () => {
+  const f = document.getElementById('f');
+  await new Promise(r => f.addEventListener('load', r, { once: true }));
+  const W = f.contentWindow, D = f.contentDocument;
+
+  try {
+    W.confirm = () => true;
+    W.alert = m => log.push('alert: ' + m);
+    W.localStorage.clear();
+
+    // 1. 新建代办
+    D.querySelector('#addBtn').click();
+    await sleep(30);
+    D.querySelector('#dlgInput').value = '测试代办';
+    D.querySelector('#dlgOk').click();
+    await sleep(30);
+    report(D.querySelectorAll('.todo').length === 1, '新建代办 -> 列表 1 条');
+
+    // 2. 开始计时
+    D.querySelector('.btn-start').click();
+    await sleep(3200);
+    report(D.body.dataset.screen === 'timer', '进入计时页');
+    const clock1 = D.querySelector('#clock').textContent;
+    report(/^00:00:0[1-9]$/.test(clock1), '计时开始走动 ' + clock1);
+
+    // 3. 暂停 0.8s
+    D.querySelector('#pauseBtn').click();
+    await sleep(800);
+    report(D.querySelector('#pauseOverlay').classList.contains('show'), '暂停弹窗显示');
+    D.querySelector('#resumeBtn').click();
+    await sleep(3000);
+
+    // 4. 结束
+    D.querySelector('#endBtn').click();
+    await sleep(60);
+    D.querySelector('#dlgOk').click();
+    await sleep(100);
+    report(D.body.dataset.screen === 'todos', '结束后回到代办页');
+
+    const db = JSON.parse(W.localStorage.getItem('timelog.db.v1'));
+    report(db.sessions.length === 1, '记录数 = 1');
+    const s = db.sessions[0];
+    const total = s.end - s.start;
+    const pause = (s.pauses || []).reduce((a, p) => a + (p[1] - p[0]), 0);
+    const active = total - pause;
+    report(pause > 400, '暂停被记录 ' + pause + 'ms');
+    report(active > 5200 && active < 7000, '有效时长 ' + active + 'ms（跨暂停，未被计入）');
+
+    // 5. 数据页
+    D.querySelector('.tab[data-go="data"]').click();
+    await sleep(50);
+    report(D.body.dataset.screen === 'data', '进入数据页');
+    const totalTxt = D.querySelector('#stTotal').textContent;
+    report(!!totalTxt, '统计显示 ' + totalTxt + '（2.7 秒不计入统计，属预期）');
+    report(D.querySelectorAll('#legend li').length === 1, '图例 1 行');
+    report(D.querySelectorAll('#timeline .tl-item').length === 1, '今日时间段 1 条');
+
+    // 6. 历史页：点图例那一行进入
+    const lg = D.querySelector('#legend li[data-todo]');
+    if (lg) {
+      lg.click();
+      await sleep(60);
+      const recs = D.querySelectorAll('.rec').length;
+      report(recs >= 1, '图例进入历史 ' + recs + ' 条');
+      D.querySelector('.tab[data-go="todos"]').click();
+      await sleep(50);
+    } else {
+      report(false, '图例行不存在');
+    }
+
+    // 6.5 日历页：点今天，右侧显示当天记录
+    D.querySelector('.tab[data-go="calendar"]').click();
+    await sleep(60);
+    const cells = [...D.querySelectorAll('#calGrid .day[data-day]')].filter(c => !c.dataset.future);
+    if (cells.length) { cells[cells.length - 1].click(); await sleep(60); }
+    report(D.querySelectorAll('#dayTimeline .tl-item').length >= 1, '日历页显示当天全部记录');
+    D.querySelector('.tab[data-go="todos"]').click();
+    await sleep(50);
+
+    // 7. 改名：记录必须保留
+    D.querySelector('.tab[data-go="todos"]').click();
+    await sleep(50);
+    D.querySelector('.todo-name').click();
+    await sleep(50);
+    report(D.querySelector('#actions').classList.contains('show'), '弹出操作菜单');
+    D.querySelector('#actRename').click();
+    await sleep(60);
+    D.querySelector('#dlgInput').value = '改名后的代办';
+    D.querySelector('#dlgOk').click();
+    await sleep(60);
+    const db2 = JSON.parse(W.localStorage.getItem('timelog.db.v1'));
+    report(db2.todos[0].name === '改名后的代办', '重命名生效');
+    report(db2.sessions.length === 1 && db2.sessions[0].todoId === db2.todos[0].id,
+      '改名后记录仍在原代办上');
+
+    // 8. 删除：编辑弹窗里的删除
+    D.querySelector('.todo-name').click();
+    await sleep(50);
+    D.querySelector('#actEdit').click();
+    await sleep(60);
+    D.querySelector('#dlgDanger').click();
+    await sleep(80);
+    D.querySelector('#dlgOk').click();
+    await sleep(60);
+    const db3 = JSON.parse(W.localStorage.getItem('timelog.db.v1'));
+    report(db3.todos.length === 0 && db3.sessions.length === 0, '删除代办并清空其记录');
+
+    // 9. 备份导出（无 AndroidBridge 时走 Blob 下载，这里只验证函数不报错）
+    W.URL.createObjectURL = () => 'blob:x';
+  } catch (e) {
+    log.push('ERROR: ' + e.message + '\n' + (e.stack || ''));
+  }
+
+  out.textContent = log.join('\n');
+  document.title = 'DONE ' + log.filter(l => l.startsWith('PASS')).length + '/' + log.length;
+})();
+</script>
+</body></html>

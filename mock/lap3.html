@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>记次 · 效果图 v3</title>
+<style>
+  :root{
+    --card:#F5F5F5; --card-2:#EDEDED;
+    --ink:#0B0B0B; --ink-2:#6B6B6B; --ink-3:#9C9C9C; --line:#E7E7E7;
+    --font:-apple-system,"SF Pro Text","PingFang SC","Noto Sans CJK SC","Microsoft YaHei",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:#fff;color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased;}
+  .screen{position:relative;width:1280px;height:800px;overflow:hidden;}
+
+  .top{position:absolute;top:32px;left:44px;}
+  .top .name{font-size:17px;font-weight:600;letter-spacing:-.3px;}
+
+  .corner{position:absolute;top:26px;right:44px;display:flex;gap:10px;}
+  .tool{width:58px;height:58px;border-radius:50%;background:var(--card);display:grid;place-items:center;color:var(--ink);}
+
+  .clock{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:clamp(54px,7.2vw,92px);font-weight:550;letter-spacing:-.01em;
+    font-variant-numeric:tabular-nums;
+  }
+
+  /* 记次面板：窄一点，最多 6 条 */
+  .laps{
+    position:absolute;right:44px;bottom:126px;
+    width:258px;background:var(--card);border-radius:20px;
+    padding:14px 16px 12px;
+  }
+  .laps-head{padding-bottom:6px;}
+  .laps-head b{font-size:12.5px;font-weight:600;letter-spacing:.2px;color:var(--ink-2);}
+
+  .lap{
+    display:flex;align-items:center;gap:8px;
+    height:40px;border-top:1px solid var(--line);
+    font-variant-numeric:tabular-nums;
+  }
+  .lap:first-of-type{border-top:0;}
+  .no{
+    width:14px;flex:none;text-align:center;
+    color:var(--ink-3);font-size:10.5px;
+  }
+  .iv{flex:1;font-size:16.5px;font-weight:500;letter-spacing:-.2px;}
+  .cu{font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;}
+
+  .live{
+    margin-top:8px;padding:11px 12px;border-radius:12px;
+    background:#fff;border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+  }
+  .live .lb{font-size:10.5px;color:var(--ink-3);letter-spacing:.3px;}
+  .live .lv{font-size:17px;font-weight:500;letter-spacing:-.2px;font-variant-numeric:tabular-nums;}
+
+  .actions{position:absolute;left:44px;bottom:44px;display:flex;gap:10px;}
+
+  .lapbtn{
+    position:absolute;right:44px;bottom:44px;
+    height:58px;padding:0 24px;border-radius:999px;
+    background:#FFFFFF;color:var(--ink);border:1px solid var(--line);
+    display:flex;align-items:center;gap:8px;
+    font-size:15px;font-weight:550;letter-spacing:.3px;
+  }
+</style>
+</head>
+<body>
+<div class="screen">
+
+  <div class="top"><span class="name">资料分析</span></div>
+
+  <div class="corner">
+    <div class="tool"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4.5" width="18" height="13" rx="2.5"/><path d="M8.5 20.5h7"/><circle cx="12" cy="11" r="2.6"/></svg></div>
+    <div class="tool"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="5.2" width="17.6" height="13.6" rx="3"/><circle cx="8.6" cy="10.2" r="1.5"/><path d="M4 16.6l4.6-4.2a1.6 1.6 0 0 1 2.1 0l2.6 2.3 1.9-1.6a1.6 1.6 0 0 1 2.1 0l2.7 2.4"/></svg></div>
+    <div class="tool"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 14.6A8.2 8.2 0 1 1 9.4 3.8a6.6 6.6 0 0 0 10.8 10.8z"/></svg></div>
+  </div>
+
+  <div class="clock">01:07:09</div>
+
+  <div class="laps">
+    <div class="laps-head"><b>记次</b></div>
+    <div class="lap"><span class="no">4</span><span class="iv">07:12</span><span class="cu">01:07:09</span></div>
+    <div class="lap"><span class="no">3</span><span class="iv">20:15</span><span class="cu">00:59:57</span></div>
+    <div class="lap"><span class="no">2</span><span class="iv">19:42</span><span class="cu">00:39:42</span></div>
+    <div class="lap"><span class="no">1</span><span class="iv">20:00</span><span class="cu">00:20:00</span></div>
+
+    <div class="live">
+      <span class="lb">距离上次记次</span>
+      <span class="lv">07:12</span>
+    </div>
+  </div>
+
+  <div class="actions">
+    <div class="tool"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="5.5" width="3.4" height="13" rx="1.2"/><rect x="13.6" y="5.5" width="3.4" height="13" rx="1.2"/></svg></div>
+    <div class="tool" style="color:#E03A2F"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.4"/></svg></div>
+  </div>
+
+  <div class="lapbtn">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 5h11l-2 3.5 2 3.5H5"/></svg>
+    记次
+  </div>
+
+</div>
+</body>
+</html>
