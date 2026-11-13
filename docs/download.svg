@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="56" viewBox="0 0 300 56">
+  <rect x="0" y="0" width="300" height="56" rx="28" fill="#0B0B0B"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M26 24v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9"/>
+    <path d="M34 18v12"/>
+    <path d="M29.5 25.5 34 30l4.5-4.5"/>
+  </g>
+  <text x="58" y="35" font-family="-apple-system, 'PingFang SC', 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif"
+        font-size="17" font-weight="600" fill="#FFFFFF" letter-spacing="0.5">下载 APK · Android 10+</text>
+</svg>

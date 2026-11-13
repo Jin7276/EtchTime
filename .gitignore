@@ -1,6 +1,7 @@
 ﻿# 构建产物
 build/
 *.apk
+!release/EtchTime-*.apk
 *.idsig
 preview.html
 
@@ -25,3 +26,4 @@ publish.ps1
 
 
 publish.bat
+

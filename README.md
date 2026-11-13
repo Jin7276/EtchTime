@@ -1,8 +1,16 @@
 # 刻时 · EtchTime
 
-> 一个白底黑字、极简的专注计时器。不是番茄钟的倒计时，而是**按代办记账式记录时间**：正计时、按天统计、日历回看、记次分段。
+<p>
+<a href="release/EtchTime-v1.0.apk">
+  <img src="docs/download.svg" alt="下载 APK" height="52">
+</a>
+</p>
 
-Android 平板横屏优先（1280×800 设计），手机竖屏也能用。纯本地存储，无账号、无网络请求。
+> 极简的专注计时器。不是番茄钟的倒计时，而是**按代办记账式记录时间**：正计时、按天统计、日历回看、记次分段。
+>
+> Android 平板横屏优先（1280×800 设计），手机竖屏也能用。纯本地存储，无账号、无网络请求。
+
+**安装**：点上面的黑色按钮下载 `EtchTime-v1.0.apk`（77 KB），传到平板后安装，需要允许「安装未知来源应用」。要求 Android 10 及以上。
 
 ![代办](docs/screenshots/01-todos.png)
 
@@ -75,6 +83,7 @@ Android 平板横屏优先（1280×800 设计），手机竖屏也能用。纯�
 │   ├── seed.html        # 灌演示数据
 │   └── convert_tomato.py# 番茄Todo 导出转本应用备份
 ├── docs/screenshots/    # 截图
+├── release/             # 可直接安装的 APK
 └── mock/                # 设计稿
 ```
 
@@ -111,7 +120,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\build_apk.ps1
   "app": "刻时",
   "version": 1,
   "exportedAt": "2026-11-13T20:00:00",
-  "todos":    [{ "id": "t001", "name": "资料分析", "createdAt": 1731500000000 }],
+  "todos":    [{ "id": "t001", "name": "高数强化", "createdAt": 1731500000000 }],
   "sessions": [{ "id": "s001", "todoId": "t001",
                  "start": 1731500000000, "end": 1731503600000,
                  "pauses": [[1731501000000, 1731501180000]],
@@ -137,7 +146,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\build_apk.ps1
 欢迎 issue 与 PR。提交前请跑一遍自测：
 
 ```bash
-# 用无头浏览器打开 tools/test.html 即可，页面里会输出 18 项检查结果
+# 用浏览器打开 tools/test.html，页面里会输出 18 项检查结果
 ```
 
 ## License
