@@ -1,0 +1,50 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>probe2</title>
+<style>body{font:13px/1.5 monospace;padding:12px;white-space:pre-wrap}</style></head>
+<body>
+<pre id="out">running...</pre>
+<iframe id="f" src="../web/index.html#screen=data" style="width:1280px;height:800px;border:1px solid #ddd"></iframe>
+<script>
+const log = [];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const out = document.getElementById('out');
+
+(async () => {
+  const f = document.getElementById('f');
+  await new Promise(r => f.addEventListener('load', r, { once: true }));
+  const W = f.contentWindow, D = f.contentDocument;
+  W.addEventListener('error', e => log.push('JS ERROR: ' + e.message));
+
+  D.addEventListener('click', e => {
+    const t = e.target;
+    log.push('CLICK reached document: <' + t.tagName + '> id=' + (t.id || '-') + ' class=' + (t.className || '-'));
+  }, true);
+
+  try {
+    await sleep(500);
+    log.push('screen=' + D.body.dataset.screen + ' stCount=' + D.querySelector('#stCount').textContent);
+    log.push('pie paths=' + D.querySelectorAll('#pie path').length + ' pie texts=' + D.querySelectorAll('#pie text').length);
+
+    D.querySelector('#dayPrev').click();
+    await sleep(300);
+    log.push('after prev: dayLabel=' + D.querySelector('#dayLabel').textContent + ' stCount=' + D.querySelector('#stCount').textContent);
+
+    D.querySelector('#dayLabel').click();
+    await sleep(300);
+    log.push('picker visible: ' + D.querySelector('#dayPicker').classList.contains('show'));
+
+    D.querySelector('.tab[data-go="calendar"]').click();
+    await sleep(400);
+    log.push('calGrid children=' + D.querySelector('#calGrid').children.length + ' days=' + D.querySelectorAll('.day[data-day]').length + ' dayLegendLen=' + D.querySelector('#dayLegend').innerHTML.length);
+    log.push('TITLE=' + D.title);
+    log.push('#calGrid count=' + D.querySelectorAll('#calGrid').length);
+    const sc = D.querySelector('.screen[data-screen="calendar"]');
+    log.push('calScreen html len=' + (sc ? sc.innerHTML.length : 'no screen'));
+    log.push('dayTitle=' + (D.querySelector('#dayTitle')||{}).textContent);
+  } catch (e) {
+    log.push('EXCEPTION: ' + e.message);
+  }
+  out.textContent = log.join('\n');
+})();
+</script>
+</body></html>

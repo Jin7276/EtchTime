@@ -44,11 +44,16 @@
     const t = Math.max(0, Math.floor(ms / 1000));
     return `${pad2(Math.floor(t / 3600))}:${pad2(Math.floor(t / 60) % 60)}:${pad2(t % 60)}`;
   };
-  const dayKey = ts => { const d = new Date(ts); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
-  const startOfDay = ts => { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  const DAY_OFFSET = 4 * 3600 * 1000;   // 凌晨 4 点前算前一天
+  const dayKey = ts => { const d = new Date(ts - DAY_OFFSET); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+  const startOfDay = ts => { const d = new Date(ts - DAY_OFFSET); d.setHours(0, 0, 0, 0); return d.getTime() + DAY_OFFSET; };
+  const dayStart = key => new Date(key + 'T00:00:00').getTime() + DAY_OFFSET;
   const addDays = (ts, n) => { const d = new Date(ts); d.setDate(d.getDate() + n); return d.getTime(); };
   const startOfWeek = ts => { const d = new Date(startOfDay(ts)); return addDays(d.getTime(), -((d.getDay() + 6) % 7)); };
-  const startOfMonth = ts => { const d = new Date(ts); return new Date(d.getFullYear(), d.getMonth(), 1).getTime(); };
+  const startOfMonth = ts => {
+    const d = new Date(ts);
+    return dayStart(`${d.getFullYear()}-${pad2(d.getMonth() + 1)}-01`);
+  };
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
   // 蓝阶：按代办数量自动插值
@@ -93,7 +98,14 @@
     try { cur = JSON.parse(localStorage.getItem(K_CUR)) || null; } catch (e) { cur = null; }
     colors = rampColors(Math.max(db.todos.length, 1));
   }
-  const saveDB = () => localStorage.setItem(K_DB, JSON.stringify(db));
+  let dbCache = '';
+  const saveDB = () => {
+    const s = JSON.stringify(db);
+    if (s === dbCache) return;
+    dbCache = s;
+    localStorage.setItem(K_DB, s);
+    aggCache.clear();
+  };
   const saveCur = () => cur ? localStorage.setItem(K_CUR, JSON.stringify(cur))
                             : localStorage.removeItem(K_CUR);
   const savePrefs = () => localStorage.setItem(K_PREF, JSON.stringify(prefs));
@@ -132,8 +144,12 @@
     }
   }
 
-  // 区间内的统计
+  // 区间内的统计（结果按区间缓存，数据变化时清空）
+  const aggCache = new Map();
   function aggregate(from, to) {
+    const ck = dayKey(from) + ':' + dayKey(to);
+    const hit = aggCache.get(ck);
+    if (hit) return hit;
     const perTodo = new Map(), perDay = new Map();
     let total = 0;
     for (const s of db.sessions) {
@@ -143,7 +159,10 @@
         (d, ms) => perDay.set(d, (perDay.get(d) || 0) + ms),
         ms => { total += ms; perTodo.set(s.todoId, (perTodo.get(s.todoId) || 0) + ms); });
     }
-    return { perTodo, perDay, total };
+    const res = { perTodo, perDay, total };
+    if (aggCache.size > 300) aggCache.clear();
+    aggCache.set(ck, res);
+    return res;
   }
 
   function rangeOf(kind) {
@@ -159,11 +178,19 @@
   const ui = { screen: 'todos', range: 'today', custom: null, day: null, pickMonth: 0, calMonth: 0, calDay: null, detailTodo: null, detailDayKey: null, detailMonth: 0 };
 
   /* ---------------- 渲染：代办列表 ---------------- */
-  function todoStats(id) {
+  function todayAll() {
     const [d0, d1] = rangeOf('today');
-    const today = aggregate(d0, d1).perTodo.get(id) || 0;
-    const cnt = db.sessions.filter(s => s.todoId === id && s.end > d0 && s.start < d1).length;
-    return { today, cnt };
+    const agg = aggregate(d0, d1);
+    const cnt = new Map();
+    for (const s of db.sessions) {
+      if (s.end <= d0 || s.start >= d1) continue;
+      cnt.set(s.todoId, (cnt.get(s.todoId) || 0) + 1);
+    }
+    return { ms: agg.perTodo, cnt };
+  }
+  function todoStats(id) {
+    const { ms, cnt } = todayAll();
+    return { today: ms.get(id) || 0, cnt: cnt.get(id) || 0 };
   }
 
   function renderTodos() {
@@ -172,8 +199,9 @@
       list.innerHTML = `<li class="todo-empty">还没有代办，点右上角「新建代办」开始</li>`;
       return;
     }
+    const all = todayAll();
     list.innerHTML = db.todos.map(t => {
-      const st = todoStats(t.id);
+      const st = { today: all.ms.get(t.id) || 0, cnt: all.cnt.get(t.id) || 0 };
       return `
       <li class="todo" data-id="${t.id}">
         <div class="todo-main">
@@ -187,7 +215,7 @@
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   /* ---------------- 渲染：扇形图 ---------------- */
-  const VB = { w: 580, h: 440, cx: 290, cy: 220, r: 168 };
+  const VB = { w: 580, h: 440, cx: 290, cy: 220, r: 148 };
 
   function arcPath(a0, a1) {
     const { cx, cy, r } = VB;
@@ -197,34 +225,74 @@
     return `M ${cx} ${cy} L ${x0} ${y0} A ${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1} ${y1} Z`;
   }
 
-  // 名称在扇形内，时长/占比用直线从名称处拉出
+  // 名称在扇形内，时长/占比用直线从名称处拉出（带上下防重叠）
   function buildLabels(items, total) {
-    const { cx, cy, r } = VB;
-    let acc = -90, out = '';
+    const { cx, cy, r, w, h } = VB;
+    if (!items.length) return '';
+
+    const placed = [];
+    let acc = -90;
     items.forEach(it => {
       const ang = (it.ms / total) * 360;
       if (ang <= 0) return;
       const mid = acc + ang / 2;
       acc += ang;
-      if (ang < 22) return;
-
+      if (ang < 16) return;
       const rad = (mid - 90) * Math.PI / 180;
       const side = Math.cos(rad) >= 0 ? 1 : -1;
-      const ix = cx + Math.cos(rad) * r * 0.58;
-      const iy = cy + Math.sin(rad) * r * 0.58;
-      const sx = cx + Math.cos(rad) * r * 0.8;
-      const sy = cy + Math.sin(rad) * r * 0.8;
-      const ex = cx + Math.cos(rad) * (r + 34);
-      const ey = cy + Math.sin(rad) * (r + 34);
-      const tx = ex + side * 6;
-      const anchor = side > 0 ? 'start' : 'end';
-
-      out += `
-        <text x="${ix}" y="${iy + 5}" text-anchor="middle" font-size="15" font-weight="600" fill="#0B0B0B">${esc(it.name)}</text>
-        <path d="M ${sx} ${sy} L ${ex} ${ey}" fill="none" stroke="#9A9A9A" stroke-width="1.3" stroke-linecap="round"/>
-        <text x="${tx}" y="${ey + 4}" text-anchor="${anchor}" font-size="13.5" fill="#7A7A7A">${fmtCN(it.ms)} ${Math.round(it.ms / total * 100)}%</text>`;
+      placed.push({
+        it, side, ang,
+        cos: Math.cos(rad), sin: Math.sin(rad),
+        y: cy + Math.sin(rad) * (r + 16),
+      });
     });
-    return out;
+
+    // 同一侧按 y 排序后强制拉开，避免文字叠在一起
+    const GAP = 24, PAD = 22;
+    [1, -1].forEach(side => {
+      const g = placed.filter(p => p.side === side).sort((a, b) => a.y - b.y);
+      for (let i = 1; i < g.length; i++) {
+        if (g[i].y - g[i - 1].y < GAP) g[i].y = g[i - 1].y + GAP;
+      }
+      const last = g[g.length - 1];
+      if (last && last.y > h - PAD) {
+        const d = last.y - (h - PAD);
+        g.forEach(p => { p.y -= d; });
+      }
+      const first = g[0];
+      if (first && first.y < PAD) {
+        const d = PAD - first.y;
+        g.forEach(p => { p.y += d; });
+      }
+    });
+
+    return placed.map(p => {
+      const { it, side, cos, sin, y } = p;
+      const ix = cx + cos * r * 0.56;
+      const iy = cy + sin * r * 0.56;
+      const sx = cx + cos * r * 0.82;
+      const sy = cy + sin * r * 0.82;
+      const ex = cx + side * (r + 26);
+
+      const val = `${fmtCN(it.ms)} ${Math.round(it.ms / total * 100)}%`;
+      const est = val.length * 12.5 * 0.62;
+      let anchor = side > 0 ? 'start' : 'end';
+      let tx = ex + side * 6;
+      // 折线终点必须落在文字外侧，不能伸进文字里
+      let lineEnd = tx - side * 5;
+      if (side > 0 && tx + est > w - 4) {
+        anchor = 'end'; tx = w - 4; lineEnd = Math.min(lineEnd, tx - est - 5);
+      } else if (side < 0 && tx - est < 4) {
+        anchor = 'start'; tx = 4; lineEnd = Math.max(lineEnd, tx + est + 5);
+      }
+      // 折线拐点若比文字更靠内，则直接连到文字外侧
+      const elbow = side > 0 ? Math.min(ex, lineEnd - 12) : Math.max(ex, lineEnd + 12);
+
+      return `
+        <text x="${ix}" y="${iy + 5}" text-anchor="middle" font-size="14" font-weight="600" fill="#0B0B0B">${esc(it.name)}</text>
+        <path d="M ${sx} ${sy} L ${elbow} ${y} L ${lineEnd} ${y}" fill="none" stroke="#9A9A9A" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="${tx}" y="${y + 4}" text-anchor="${anchor}" font-size="12.5" fill="#7A7A7A">${val}</text>`;
+    }).join('');
   }
 
   function renderPie(total, items) {
@@ -255,12 +323,14 @@
   }
 
   /* ---------------- 渲染：日历 ---------------- */
+  // 五档热度：1h 内 / 1-3h / 3-5h / 5-7h / 7h 以上
   function heatClass(ms) {
     const m = ms / 60000;
     if (!m) return '';
-    if (m > 110) return 'h4';
-    if (m > 70) return 'h3';
-    if (m > 40) return 'h2';
+    if (m >= 420) return 'h5';
+    if (m >= 300) return 'h4';
+    if (m >= 180) return 'h3';
+    if (m >= 60) return 'h2';
     return 'h1';
   }
 
@@ -280,8 +350,8 @@
     let html = '';
     for (let i = 0; i < lead; i++) html += '<div class="day blank"></div>';
     for (let d = 1; d <= days; d++) {
-      const ts = new Date(y, m, d).getTime();
-      const key = dayKey(ts);
+      const key = `${y}-${pad2(m + 1)}-${pad2(d)}`;
+      const ts = dayStart(key);
       const ms = perDay.get(key) || 0;
       const future = ts > Date.now();
       const cls = ['day', future ? 'future' : heatClass(ms),
@@ -294,21 +364,17 @@
 
     // 右侧当天占比 + 时间段
     const k = ui.calDay || todayKey;
-    const dd = new Date(k + 'T00:00:00');
+    const dd = new Date(dayStart(k));
     const WD = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
     const dFrom = dd.getTime(), dTo = addDays(dFrom, 1);
-    const list = db.sessions.filter(s => s.end > dFrom && s.start < dTo).sort((a, b) => a.start - b.start);
+    const list = sessionsForRange(dFrom, dTo).sort((a, b) => a.s.start - b.s.start);
     const perTodo = new Map();
     let total = 0;
-    for (const s of list) {
-      const ms = sessionMs(s);
-      total += ms;
-      perTodo.set(s.todoId, (perTodo.get(s.todoId) || 0) + ms);
+    for (const x of list) {
+      total += x.ms;
+      perTodo.set(x.s.todoId, (perTodo.get(x.s.todoId) || 0) + x.ms);
     }
-    const items = db.todos
-      .map(t => ({ id: t.id, name: t.name, color: colorOf(t.id), ms: perTodo.get(t.id) || 0 }))
-      .filter(i => i.ms > 0)
-      .sort((a, b) => b.ms - a.ms);
+    const items = assignColors(perTodo, dFrom, dTo).sort((a, b) => b.ms - a.ms);
 
     const hm = ts => { const x = new Date(ts); return `${pad2(x.getHours())}:${pad2(x.getMinutes())}`; };
 
@@ -333,30 +399,27 @@
   }
 
   /* ---------------- 数据页 ---------------- */
+  // 按「区间内最先开始」排序分配渐变色，数据页与日历页共用
+  function assignColors(perTodo, from, to) {
+    const ordered = db.todos
+      .filter(t => (perTodo.get(t.id) || 0) > 0)
+      .sort((a, b) => (perTodo.get(b.id) || 0) - (perTodo.get(a.id) || 0));
+    const ramp = rampColors(Math.max(ordered.length, 1));
+    return ordered.map((t, i) => ({
+      id: t.id, name: t.name, color: ramp[i], ms: perTodo.get(t.id) || 0,
+    }));
+  }
+
   function currentData() {
     let from, to;
     if (ui.day) {
-      from = new Date(ui.day + 'T00:00:00').getTime();
+      from = dayStart(ui.day);
       to = addDays(from, 1);
     } else {
       [from, to] = rangeOf(ui.range);
     }
     const agg = aggregate(from, to);
-    // 起始时间最早的排第一，按顺序分配颜色
-    const firstStart = new Map();
-    for (const s of db.sessions) {
-      if (s.end <= from || s.start >= to) continue;
-      const cur0 = firstStart.get(s.todoId);
-      if (cur0 === undefined || s.start < cur0) firstStart.set(s.todoId, s.start);
-    }
-    const ordered = db.todos
-      .filter(t => (agg.perTodo.get(t.id) || 0) > 0)
-      .sort((a, b) => (firstStart.get(a.id) || 0) - (firstStart.get(b.id) || 0));
-    const ramp = rampColors(Math.max(ordered.length, 1));
-    const items = ordered
-      .map((t, i) => ({ id: t.id, name: t.name, color: ramp[i], light: rampLight(i, ordered.length),
-                        ms: agg.perTodo.get(t.id) || 0 }))
-      .sort((a, b) => b.ms - a.ms);
+    const items = assignColors(agg.perTodo, from, to).sort((a, b) => b.ms - a.ms);
     return { total: agg.total, items };
   }
 
@@ -369,7 +432,7 @@
 
     let from, to;
     if (ui.day) {
-      from = new Date(ui.day + 'T00:00:00').getTime();
+      from = dayStart(ui.day);
       to = addDays(from, 1);
     } else {
       [from, to] = rangeOf(ui.range);
@@ -388,26 +451,38 @@
     }
 
     const days = Math.max(1, Math.ceil((to - from) / DAY));
-    const list = db.sessions.filter(s => s.end > from && s.start < to && sessionMs(s) >= 10000);
-    $('#stCount').textContent = list.length;
+    $('#stCount').textContent = sessionsForRange(from, to).filter(x => x.ms >= 10000).length;
     $('#stTotal').textContent = total ? fmtMH(total) : '—';
     $('#stAvg').textContent = total ? fmtMH(total / days) : '—';
   }
 
   // 时间段（今日或选中某天）
+  // 区间内每条记录「切片后」的时长（跨天只算落在本区间的那部分）
+  function sessionsForRange(from, to) {
+    const out = [];
+    for (const s of db.sessions) {
+      if (s.end <= from || s.start >= to) continue;
+      let ms = 0;
+      accumulate(activeIntervals(s), from, to, () => {}, m => { ms += m; });
+      if (ms <= 0) continue;
+      out.push({ s, ms, from: Math.max(s.start, from), to: Math.min(s.end, to) });
+    }
+    return out;
+  }
+
   function renderTimeline(from, to, isDay) {
-    const list = db.sessions
-      .filter(s => s.end > from && s.start < to && sessionMs(s) >= 10000)
-      .sort((a, b) => a.start - b.start);
+    const list = sessionsForRange(from, to)
+      .filter(x => x.ms >= 10000)
+      .sort((a, b) => a.s.start - b.s.start);
     const hm = ts => { const d = new Date(ts); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
-    $('#timeline').innerHTML = list.length ? list.map((s, i) => `
-      <li class="tl-item" data-sid="${s.id}">
+    $('#timeline').innerHTML = list.length ? list.map((x, i) => `
+      <li class="tl-item" data-sid="${x.s.id}">
         <span class="tl-num">${i + 1}</span>
         <div class="tl-main">
-          <div class="tl-name">${esc(todoName(s.todoId))}</div>
-          <div class="tl-time">${hm(s.start)} – ${hm(s.end)}</div>
+          <div class="tl-name">${esc(todoName(x.s.todoId))}</div>
+          <div class="tl-time">${hm(x.from)} – ${hm(x.to)}</div>
         </div>
-        <span class="tl-dur">${fmtMH(sessionMs(s))}</span>
+        <span class="tl-dur">${fmtMH(x.ms)}</span>
       </li>`).join('') : `<li class="tl-empty">这天没有记录</li>`;
 
     const show = isDay || ui.range === 'today';
@@ -435,27 +510,29 @@
     $('#detailName').textContent = t.name;
 
     const key = ui.detailDayKey || dayKey(Date.now());
-    const from = new Date(key + 'T00:00:00').getTime(), to = addDays(from, 1);
-    const list = db.sessions
-      .filter(s => s.todoId === id && s.end > from && s.start < to)
-      .sort((a, b) => b.start - a.start);
-    const total = list.reduce((a, s) => a + sessionMs(s), 0);
+    const from = dayStart(key), to = addDays(from, 1);
+    const list = sessionsForRange(from, to)
+      .filter(x => x.s.todoId === id)
+      .sort((a, b) => b.s.start - a.s.start);
+    const total = list.reduce((a, x) => a + x.ms, 0);
 
     const d = new Date(from);
     $('#detailSub').textContent = `${d.getMonth() + 1}月${d.getDate()}日 · ` +
       (list.length ? `${fmtCN(total)} · ${list.length} 次` : '没有记录');
 
     const hm = ts => { const x = new Date(ts); return `${pad2(x.getHours())}:${pad2(x.getMinutes())}`; };
-    $('#records').innerHTML = list.length ? list.map(s => {
-      const idx = list.indexOf(s) + 1;
-      return `<div class="rec" data-sid="${s.id}">
-        <span class="r-num">${idx}</span>
+    const MAXR = 60;
+    const shown = list.slice(0, MAXR);
+    const moreNote = list.length > MAXR
+      ? `<div class="rec-empty">当天记录较多，先显示最近 ${MAXR} 条</div>` : '';
+    $('#records').innerHTML = list.length ? shown.map((x, i) => `
+      <div class="rec" data-sid="${x.s.id}">
+        <span class="r-num">${i + 1}</span>
         <div>
-          <div class="r-time">${hm(s.start)} – ${hm(s.end)}</div>
+          <div class="r-time">${hm(x.from)} – ${hm(x.to)}</div>
         </div>
-        <div class="r-dur">${fmtMH(sessionMs(s))}</div>
-      </div>`;
-    }).join('') : `<div class="rec-empty">这天没有记录</div>`;
+        <div class="r-dur">${fmtMH(x.ms)}</div>
+      </div>`).join('') + moreNote : `<div class="rec-empty">这天没有记录</div>`;
 
     renderDayStrip();
   }
@@ -474,8 +551,8 @@
     let html = '';
     for (let i = 0; i < lead; i++) html += '<div class="hday blank"></div>';
     for (let d = 1; d <= days; d++) {
-      const ts = new Date(y, m, d).getTime();
-      const k = dayKey(ts);
+      const k = `${y}-${pad2(m + 1)}-${pad2(d)}`;
+      const ts = dayStart(k);
       const cls = ['hday', has.has(k) ? 'has' : '', k === today ? 'today' : '',
         k === key ? 'sel' : '', ts > Date.now() ? 'future' : ''].filter(Boolean).join(' ');
       html += `<button class="${cls}" data-dkey="${k}"><span class="hd">${d}</span></button>`;
@@ -516,6 +593,7 @@
       if (el) { el.classList.remove('enter'); void el.offsetWidth; el.classList.add('enter'); }
     }
     $$('.tab').forEach(t => t.classList.toggle('on', t.dataset.go === screen));
+    refreshKeepScreen();
     if (screen === 'data') refreshData();
     if (screen === 'calendar') renderCalendar();
     if (screen === 'me') renderMe();
@@ -540,12 +618,14 @@
     renderLaps();
     tick();
     clearInterval(tickTimer);
-    tickTimer = setInterval(tick, 250);
+    tickTimer = setInterval(tick, 1000);
   }
 
+  let clockEl = null;
   function tick() {
     if (!cur) return;
-    $('#clock').textContent = fmtClock(elapsedMs());
+    clockEl = clockEl || $('#clock');
+    clockEl.textContent = fmtClock(elapsedMs());
     const live = $('#lapLive');
     if (live) {
       const laps = cur.laps || [];
@@ -584,6 +664,18 @@
     } catch (e) {}
   }
 
+  function abortTimer() {
+    cur = null;
+    saveCur();
+    syncNative();
+    clearInterval(tickTimer);
+    clearInterval(pauseTimer);
+    $('#pauseOverlay').classList.remove('show');
+    const lp = $('#lapPanel');
+    if (lp) lp.hidden = true;
+    refreshKeepScreen();
+  }
+
   function startTimer(todoId) {
     if (cur) {                  // 已有进行中的计时，先结束它
       openDialog({
@@ -615,6 +707,7 @@
     cur.pausedAt = Date.now();
     saveCur(); syncNative();
     $('#pauseOverlay').classList.add('show');
+    refreshKeepScreen();
     const paint = () => { $('#pauseTime').textContent = fmtMS(pausedTotal()); };
     paint();
     clearInterval(pauseTimer);
@@ -628,6 +721,7 @@
     saveCur(); syncNative();
     clearInterval(pauseTimer);
     $('#pauseOverlay').classList.remove('show');
+    refreshKeepScreen();
     tick();
   }
 
@@ -706,8 +800,8 @@
     let html = '';
     for (let i = 0; i < lead; i++) html += '<div class="hday blank"></div>';
     for (let d = 1; d <= days; d++) {
-      const ts = new Date(y, m, d).getTime();
-      const k = dayKey(ts);
+      const k = `${y}-${pad2(m + 1)}-${pad2(d)}`;
+      const ts = dayStart(k);
       const cls = ['hday', k === today ? 'today' : '', k === sel ? 'sel' : '',
         ts > Date.now() ? 'future' : ''].filter(Boolean).join(' ');
       html += `<button class="${cls}" data-dkey="${k}"><span class="hd">${d}</span></button>`;
@@ -832,8 +926,8 @@
   function applyRange() {
     const a = $('#rgFrom').value, b = $('#rgTo').value;
     if (!a || !b) { $('#rgMsg').textContent = '两个日期都要选'; return; }
-    let from = new Date(a + 'T00:00:00').getTime();
-    let to = addDays(new Date(b + 'T00:00:00').getTime(), 1);
+    let from = dayStart(a);
+    let to = addDays(dayStart(b), 1);
     if (to <= from) { $('#rgMsg').textContent = '结束日期要晚于开始日期'; return; }
     ui.custom = [from, to];
     ui.range = 'custom';
@@ -854,6 +948,7 @@
         if (!v) return;
         t.name = v.slice(0, 20);
         saveDB(); renderTodos(); closeDialog();
+        if (cur && cur.todoId === id) syncNative();
         if (ui.detailTodo === id) renderDetail();
       },
     });
@@ -881,7 +976,7 @@
       onOk: () => {
         db.todos = db.todos.filter(t => t.id !== id);
         db.sessions = db.sessions.filter(s => s.todoId !== id);
-        if (cur && cur.todoId === id) { cur = null; saveCur(); }
+        if (cur && cur.todoId === id) abortTimer();
         saveDB(); renderTodos(); closeDialog();
         if (ui.screen === 'data') refreshData();
         if (ui.detailTodo === id) go('todos');
@@ -945,13 +1040,18 @@
   }
 
   /* ---------------- 设置：主题 / 背景 ---------------- */
+  function refreshKeepScreen() {
+    const on = !!prefs.keep && ui.screen === 'timer' && !!cur && !cur.pausedAt;
+    if (window.AndroidBridge && window.AndroidBridge.setKeepScreen) {
+      try { window.AndroidBridge.setKeepScreen(on); } catch (e) {}
+    }
+  }
+
   function applyPrefs() {
     document.body.dataset.theme = prefs.theme;
     const kb = $('#keepBtn');
     if (kb) kb.classList.toggle('off', !prefs.keep);
-    if (window.AndroidBridge && window.AndroidBridge.setKeepScreen) {
-      try { window.AndroidBridge.setKeepScreen(!!prefs.keep); } catch (e) {}
-    }
+    refreshKeepScreen();
     if (window.AndroidBridge && window.AndroidBridge.setBars) {
       try { window.AndroidBridge.setBars(prefs.theme === 'dark'); } catch (e) {}
     }
@@ -1052,7 +1152,8 @@
           title: '修改时间', timeStart: hm(s.start), timeEnd: hm(s.end),
           onOk: () => {
             const [h1, m1, h2, m2] = readWheels();
-            const base = startOfDay(s.start);
+            const d0 = new Date(s.start); d0.setHours(0, 0, 0, 0);
+            const base = d0.getTime();
             const st = base + (h1 * 60 + m1) * 60000;
             const en = base + (h2 * 60 + m2) * 60000;
             if (en <= st) { $('#dlgMsg').textContent = '结束时间要晚于开始时间'; return; }
@@ -1084,14 +1185,14 @@
     if (e.target.closest('#dayPrev') || e.target.closest('#dayNext')) {
       const base = ui.day || dayKey(Date.now());
       const n = e.target.closest('#dayPrev') ? -1 : 1;
-      const k = dayKey(addDays(new Date(base + 'T00:00:00').getTime(), n));
+      const k = dayKey(addDays(dayStart(base), n));
       if (k > dayKey(Date.now())) { toast('还没到那天'); return; }
       ui.day = k;
       $$('.segmented[data-seg="range"] button').forEach(b => b.classList.remove('on'));
       refreshData();
       return;
     }
-    if (e.target.closest('#dataCalBtn')) { openDayPicker(); return; }
+    if (e.target.closest('#dataCalBtn') || e.target.closest('#dayLabel')) { openDayPicker(); return; }
     if (e.target.closest('#pkPrev') || e.target.closest('#pkNext')) {
       ui.pickMonth += (e.target.closest('#pkPrev') ? -1 : 1);
       renderDayPicker();
@@ -1160,7 +1261,14 @@
       openDialog({
         title: '清空所有数据', msg: '所有代办和计时记录都会删除，不可恢复。建议先导出备份。',
         okText: '清空',
-        onOk: () => { localStorage.removeItem(K_DB); localStorage.removeItem(K_CUR); db = { todos: [], sessions: [] }; cur = null; renderTodos(); closeDialog(); go('todos'); },
+        onOk: () => {
+          abortTimer();
+          localStorage.removeItem(K_CUR);
+          db = { todos: [], sessions: [] };
+          saveDB();
+          aggCache.clear();
+          renderTodos(); closeDialog(); go('todos');
+        },
       });
       return;
     }

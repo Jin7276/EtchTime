@@ -29,3 +29,6 @@ publish.bat
 
 push2.bat
 
+push_ssh.bat
+timer-app-upload/
+

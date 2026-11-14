@@ -96,12 +96,10 @@ public class TimerService extends Service {
         return String.format("%02d:%02d:%02d", t / 3600, (t / 60) % 60, t % 60);
     }
 
+    /** 用系统 Chronometer 走秒，不再每秒重建通知 */
     void tick() {
-        h.removeCallbacksAndMessages(null);
-        if (!running) return;
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (nm != null) nm.notify(NID, buildNotification(label + " 进行中", fmt(elapsed())));
-        h.postDelayed(this::tick, 400);   // 400ms 刷新，和界面差不超过半秒
     }
 
     Notification buildNotification(String title, String time) {
@@ -116,8 +114,14 @@ public class TimerService extends Service {
                 .setContentText(time)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
-                .setContentIntent(pi)
-                .setShowWhen(false);
+                .setContentIntent(pi);
+        if (pausedAt > 0) {
+            b.setShowWhen(false);
+        } else {
+            b.setUsesChronometer(true);
+            b.setWhen(System.currentTimeMillis() - elapsed());
+            b.setShowWhen(true);
+        }
         return b.build();
     }
 }
