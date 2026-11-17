@@ -6,27 +6,46 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.SystemClock;
 
 public class TimerService extends Service {
 
-    static final String CH = "timer_state";
+    static final String CH = "timer_state_v2";
     static final int NID = 1001;
 
     private final Handler h = new Handler(Looper.getMainLooper());
-    private long startMs = 0, pausedTotal = 0, pausedAt = 0;
+    private long baseElapsed = 0;     // 解析那一刻的有效时长
+    private long monoAtParse = 0;     // 解析时的单调时钟
+    private long pausedAt = 0;        // 暂停开始（墙钟），0 表示运行中
     private String label = "计时中";
     private boolean running = false;
+    private SharedPreferences sp;
+
+    private final Runnable ticker = new Runnable() {
+        @Override public void run() {
+            if (!running) return;
+            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (nm != null) {
+                try { nm.notify(NID, build()); } catch (Exception ignored) {}
+            }
+            h.postDelayed(this, 1000);
+        }
+    };
 
     @Override
     public void onCreate() {
         super.onCreate();
+        sp = getSharedPreferences("timer_state", MODE_PRIVATE);
         if (Build.VERSION.SDK_INT >= 26) {
-            NotificationChannel c = new NotificationChannel(CH, "计时状态", NotificationManager.IMPORTANCE_LOW);
+            NotificationChannel c = new NotificationChannel(CH, "计时状态", NotificationManager.IMPORTANCE_DEFAULT);
             c.setShowBadge(false);
+            c.setSound(null, null);
+            c.enableVibration(false);
             NotificationManager nm = getSystemService(NotificationManager.class);
             if (nm != null) nm.createNotificationChannel(c);
         }
@@ -34,28 +53,29 @@ public class TimerService extends Service {
 
     @Override
     public int onStartCommand(Intent it, int flags, int startId) {
-        Notification n0 = buildNotification("计时中", "00:00:00");
-        if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(NID, n0, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+        String payload = it != null ? it.getStringExtra("sync") : null;
+
+        if (payload != null) {
+            if (payload.isEmpty() || !parse(payload)) { stopAll(); return START_NOT_STICKY; }
+            sp.edit().putString("payload", payload).apply();
+            running = true;
         } else {
-            startForeground(NID, n0);
+            // 服务被系统重建：接着上次的状态，避免出现空白或 00:00:00 的通知
+            String saved = sp.getString("payload", "");
+            if (saved == null || saved.isEmpty() || !parse(saved)) { stopAll(); return START_NOT_STICKY; }
+            running = true;
         }
-        if (it != null) {
-            String payload = it.getStringExtra("sync");
-            if (payload != null && !payload.isEmpty()) sync(payload);
-        }
-        if (!running) { stopForeground(true); stopSelf(); }
+
+        startForegroundNow();   // 一次就发真实数据，不再先发占位通知
+        scheduleTick();
         return START_NOT_STICKY;
     }
 
     @Override public IBinder onBind(Intent it) { return null; }
 
-    /** 用户把 App 从后台划掉时，安静地结束服务，不弹任何提示 */
     @Override
     public void onTaskRemoved(Intent root) {
-        h.removeCallbacksAndMessages(null);
-        stopForeground(true);
-        stopSelf();
+        stopAll();
         super.onTaskRemoved(root);
     }
 
@@ -65,30 +85,51 @@ public class TimerService extends Service {
         super.onDestroy();
     }
 
-    /** 格式：start;pausedTotal;pausedAt;label */
-    void sync(String s) {
-        if (s == null || s.isEmpty()) {
-            running = false;
-            h.removeCallbacksAndMessages(null);
-            stopForeground(true);
-            stopSelf();
-            return;
+    private void stopAll() {
+        running = false;
+        h.removeCallbacksAndMessages(null);
+        if (sp != null) sp.edit().remove("payload").apply();
+        try { stopForeground(true); } catch (Exception ignored) {}
+        stopSelf();
+    }
+
+    private void startForegroundNow() {
+        Notification n = build();
+        if (Build.VERSION.SDK_INT >= 34) {
+            startForeground(NID, n, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+        } else {
+            startForeground(NID, n);
         }
+    }
+
+    private void scheduleTick() {
+        h.removeCallbacksAndMessages(null);
+        h.post(ticker);
+    }
+
+    /** 格式：start;pausedTotal;pausedAt;label */
+    private boolean parse(String s) {
         String[] p = s.split(";", -1);
+        long startMs, pausedTotal;
         try {
             startMs = Long.parseLong(p[0].trim());
             pausedTotal = Long.parseLong(p[1].trim());
             pausedAt = Long.parseLong(p[2].trim());
-        } catch (Exception e) { return; }
+        } catch (Exception e) {
+            return false;
+        }
         label = p.length > 3 ? p[3] : "计时中";
-        running = true;
-        tick();
+        long nowWall = System.currentTimeMillis();
+        long livePause = pausedAt > 0 ? Math.max(0, nowWall - pausedAt) : 0;
+        baseElapsed = Math.max(0, nowWall - startMs - pausedTotal - livePause);
+        monoAtParse = SystemClock.elapsedRealtime();
+        return true;
     }
 
-    long elapsed() {
-        long now = System.currentTimeMillis();
-        long live = pausedAt > 0 ? now - pausedAt : 0;
-        return Math.max(0, now - startMs - pausedTotal - live);
+    /** 用单调时钟推进，改系统时间不会算错 */
+    private long elapsed() {
+        if (pausedAt > 0) return baseElapsed;
+        return Math.max(0, baseElapsed + (SystemClock.elapsedRealtime() - monoAtParse));
     }
 
     static String fmt(long ms) {
@@ -96,32 +137,23 @@ public class TimerService extends Service {
         return String.format("%02d:%02d:%02d", t / 3600, (t / 60) % 60, t % 60);
     }
 
-    /** 用系统 Chronometer 走秒，不再每秒重建通知 */
-    void tick() {
-        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        if (nm != null) nm.notify(NID, buildNotification(label + " 进行中", fmt(elapsed())));
-    }
-
-    Notification buildNotification(String title, String time) {
+    private Notification build() {
         Intent open = new Intent(this, MainActivity.class);
         open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
         PendingIntent pi = PendingIntent.getActivity(this, 0, open,
                 Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0);
+
         Notification.Builder b = Build.VERSION.SDK_INT >= 26
                 ? new Notification.Builder(this, CH) : new Notification.Builder(this);
+        long ms = elapsed();
         b.setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(title)
-                .setContentText(time)
+                .setContentTitle(label + (pausedAt > 0 ? " 已暂停" : " 进行中"))
+                .setContentText(fmt(ms))
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
-                .setContentIntent(pi);
-        if (pausedAt > 0) {
-            b.setShowWhen(false);
-        } else {
-            b.setUsesChronometer(true);
-            b.setWhen(System.currentTimeMillis() - elapsed());
-            b.setShowWhen(true);
-        }
+                .setContentIntent(pi)
+                .setShowWhen(true)
+                .setWhen(System.currentTimeMillis() - ms);
         return b.build();
     }
 }

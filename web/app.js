@@ -1434,7 +1434,12 @@
   const q = new URLSearchParams(location.hash.replace(/^#/, ''));
   go(q.get('screen') || 'todos');
 
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && cur) syncNative();
+  });
   if (cur) {
+    syncNative();      // 重开 App 时立刻恢复通知，不用等操作
     openTimer();
     if (cur.pausedAt) {
       $('#pauseTime').textContent = fmtMS(pausedTotal());
