@@ -1,7 +1,7 @@
 # 刻时 · EtchTime
 
 <p>
-<a href="release/EtchTime-v1.5.apk">
+<a href="release/EtchTime-v1.6.apk">
   <img src="docs/download.svg" alt="下载 APK" height="52">
 </a>
 </p>
@@ -10,7 +10,7 @@
 >
 > Android 平板横屏优先（1280×800 设计），手机竖屏也能用。纯本地存储，无账号、无网络请求。
 
-**安装**：点上面的黑色按钮下载 `EtchTime-v1.5.apk`（62 KB），传到平板后安装，需要允许「安装未知来源应用」。要求 Android 10 及以上。
+**安装**：点上面的黑色按钮下载 `EtchTime-v1.6.apk`（62 KB），传到平板后安装，需要允许「安装未知来源应用」。要求 Android 10 及以上。
 
 **每个界面的详细说明**见 [界面说明](docs/GUIDE.md)。
 

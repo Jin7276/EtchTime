@@ -167,6 +167,10 @@ public class TimerService extends Service {
                 .setShowWhen(false)
                 .setCustomContentView(rv)
                 .setCustomBigContentView(rv);
+        // 关键：让系统立刻展示前台通知，不要默认延迟最多 10 秒
+        if (Build.VERSION.SDK_INT >= 31) {
+            b.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE);
+        }
         return b.build();
     }
 }
