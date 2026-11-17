@@ -14,7 +14,7 @@
         android:layout_height="wrap_content"
         android:text="计时中"
         android:textColor="#C2C2C2"
-        android:textSize="13sp"
+        android:textSize="14sp"
         android:maxLines="1"
         android:ellipsize="end" />
 
@@ -25,8 +25,7 @@
         android:layout_marginTop="1dp"
         android:includeFontPadding="false"
         android:textColor="#F5F5F5"
-        android:textSize="26sp"
-        android:textStyle="bold"
+        android:textSize="14sp"
         android:fontFamily="sans-serif-medium" />
 
 </LinearLayout>

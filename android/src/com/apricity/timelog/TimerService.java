@@ -156,7 +156,7 @@ public class TimerService extends Service {
                 dark ? R.layout.notif_timer_dark : R.layout.notif_timer);
         rv.setTextViewText(R.id.n_title, label + state);
         // 大号时间：交给系统 Chronometer 渲染，打开通知栏时不会跳变
-        rv.setChronometer(R.id.n_time, System.currentTimeMillis() - ms, null, !paused);
+        rv.setChronometer(R.id.n_time, SystemClock.elapsedRealtime() - ms, null, !paused);
 
         b.setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(label + state)
