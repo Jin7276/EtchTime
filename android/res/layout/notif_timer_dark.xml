@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingLeft="16dp"
+    android:paddingRight="16dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="10dp">
+
+    <TextView
+        android:id="@+id/n_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="计时中"
+        android:textColor="#C2C2C2"
+        android:textSize="13sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <Chronometer
+        android:id="@+id/n_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:includeFontPadding="false"
+        android:textColor="#F5F5F5"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-medium" />
+
+</LinearLayout>

@@ -660,7 +660,7 @@
     try {
       if (!cur) { B.syncTimer(''); return; }
       const pausedTotal = (cur.pauses || []).reduce((a, p) => a + (p[1] - p[0]), 0);
-      B.syncTimer([cur.start, pausedTotal, cur.pausedAt || 0, todoName(cur.todoId)].join(';'));
+      B.syncTimer([cur.start, pausedTotal, cur.pausedAt || 0, todoName(cur.todoId), prefs.theme === 'dark' ? 'D' : 'L'].join(';'));
     } catch (e) {}
   }
 

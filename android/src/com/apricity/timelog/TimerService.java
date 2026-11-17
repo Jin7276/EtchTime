@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.widget.RemoteViews;
 
 public class TimerService extends Service {
 
@@ -23,6 +24,7 @@ public class TimerService extends Service {
     private long monoAtParse = 0;     // 解析时的单调时钟
     private long pausedAt = 0;        // 暂停开始（墙钟），0 表示运行中
     private String label = "计时中";
+    private boolean dark = false;
     private boolean running = false;
     private SharedPreferences sp;
 
@@ -119,6 +121,7 @@ public class TimerService extends Service {
             return false;
         }
         label = p.length > 3 ? p[3] : "计时中";
+        dark = p.length > 4 && "D".equalsIgnoreCase(p[4].trim());
         long nowWall = System.currentTimeMillis();
         long livePause = pausedAt > 0 ? Math.max(0, nowWall - pausedAt) : 0;
         baseElapsed = Math.max(0, nowWall - startMs - pausedTotal - livePause);
@@ -147,21 +150,23 @@ public class TimerService extends Service {
                 ? new Notification.Builder(this, CH) : new Notification.Builder(this);
         long ms = elapsed();
         boolean paused = pausedAt > 0;
+        String state = paused ? " 已暂停" : " 进行中";
+
+        RemoteViews rv = new RemoteViews(getPackageName(),
+                dark ? R.layout.notif_timer_dark : R.layout.notif_timer);
+        rv.setTextViewText(R.id.n_title, label + state);
+        // 大号时间：交给系统 Chronometer 渲染，打开通知栏时不会跳变
+        rv.setChronometer(R.id.n_time, System.currentTimeMillis() - ms, null, !paused);
+
         b.setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(label + (paused ? " 已暂停" : " 进行中"))
+                .setContentTitle(label + state)
+                .setContentText(fmt(ms))
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
-                .setContentIntent(pi);
-        if (paused) {
-            b.setContentText(fmt(ms)).setShowWhen(false);
-        } else {
-            // 时间交给系统渲染，打开通知栏时不会再出现"先旧后新"的跳变
-            b.setContentText("计时中")
-             .setUsesChronometer(true)
-             .setChronometerCountDown(false)
-             .setWhen(System.currentTimeMillis() - ms)
-             .setShowWhen(true);
-        }
+                .setContentIntent(pi)
+                .setShowWhen(false)
+                .setCustomContentView(rv)
+                .setCustomBigContentView(rv);
         return b.build();
     }
 }
