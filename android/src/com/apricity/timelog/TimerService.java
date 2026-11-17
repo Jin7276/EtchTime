@@ -33,7 +33,7 @@ public class TimerService extends Service {
             if (nm != null) {
                 try { nm.notify(NID, build()); } catch (Exception ignored) {}
             }
-            h.postDelayed(this, 1000);
+            h.postDelayed(this, 10000);
         }
     };
 
@@ -146,14 +146,22 @@ public class TimerService extends Service {
         Notification.Builder b = Build.VERSION.SDK_INT >= 26
                 ? new Notification.Builder(this, CH) : new Notification.Builder(this);
         long ms = elapsed();
+        boolean paused = pausedAt > 0;
         b.setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(label + (pausedAt > 0 ? " 已暂停" : " 进行中"))
-                .setContentText(fmt(ms))
+                .setContentTitle(label + (paused ? " 已暂停" : " 进行中"))
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
-                .setContentIntent(pi)
-                .setShowWhen(true)
-                .setWhen(System.currentTimeMillis() - ms);
+                .setContentIntent(pi);
+        if (paused) {
+            b.setContentText(fmt(ms)).setShowWhen(false);
+        } else {
+            // 时间交给系统渲染，打开通知栏时不会再出现"先旧后新"的跳变
+            b.setContentText("计时中")
+             .setUsesChronometer(true)
+             .setChronometerCountDown(false)
+             .setWhen(System.currentTimeMillis() - ms)
+             .setShowWhen(true);
+        }
         return b.build();
     }
 }
